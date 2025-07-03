@@ -39,6 +39,7 @@ if __name__ == "__main__":
         except ValueError as e:
             print(f"'{name}': {e}")
 
+    print_evolutions("pikachu")
     print_evolutions("charmander")
     print_evolutions("charmeleon")
     print_evolutions("charizard")
