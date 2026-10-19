@@ -1,0 +1,143 @@
+"""Single-file HackerRank version of the mini PokeAPI exercise.
+
+Implement the requested changes in `mini_pokeapi.py`:
+
+1. Fix the existing behavior so `get_evolutions()` returns the evolution path containing the requested Pokémon.
+2. Add caching so repeated lookups do not repeat either API request.
+
+The public interface is already defined. The mock client represents the remote Pokémon API, so no network access is required.
+
+Expected results:
+
+```text
+charmander -> ["charmander", "charmeleon", "charizard"]
+eevee      -> ["eevee", "vaporeon"]
+jolteon    -> ["eevee", "jolteon"]
+```
+"""
+
+from abc import ABC, abstractmethod
+import json
+import sys
+from typing import Any
+
+
+class PokemonApiClient(ABC):
+    @abstractmethod
+    def get_pokemon_species(self, name: str) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_evolution_chain(self, url: str) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class CountingMockPokemonApiClient(PokemonApiClient):
+    """Mock API used so the script runs without network access."""
+
+    def __init__(self) -> None:
+        self.species_requests: list[str] = []
+        self.chain_requests: list[str] = []
+
+    def get_pokemon_species(self, name: str) -> dict[str, Any]:
+        self.species_requests.append(name)
+        chain_by_pokemon = {
+            "charmander": "chain-2",
+            "charmeleon": "chain-2",
+            "charizard": "chain-2",
+            "eevee": "chain-67",
+            "vaporeon": "chain-67",
+            "jolteon": "chain-67",
+        }
+        if name not in chain_by_pokemon:
+            raise ValueError("The Pokémon does not exist")
+        return {"evolution_chain": {"url": chain_by_pokemon[name]}}
+
+    def get_evolution_chain(self, url: str) -> dict[str, Any]:
+        self.chain_requests.append(url)
+        chains = {
+            "chain-2": {
+                "chain": {
+                    "species": {"name": "charmander"},
+                    "evolves_to": [{
+                        "species": {"name": "charmeleon"},
+                        "evolves_to": [{
+                            "species": {"name": "charizard"},
+                            "evolves_to": [],
+                        }],
+                    }],
+                }
+            },
+            "chain-67": {
+                "chain": {
+                    "species": {"name": "eevee"},
+                    "evolves_to": [
+                        {"species": {"name": "vaporeon"}, "evolves_to": []},
+                        {"species": {"name": "jolteon"}, "evolves_to": []},
+                    ],
+                }
+            },
+        }
+        if url not in chains:
+            raise ValueError("The evolution chain does not exist")
+        return chains[url]
+
+
+class PokemonAdapter:
+    def __init__(self, pokemon_api_client: PokemonApiClient) -> None:
+        self.pokemon_api_client = pokemon_api_client
+
+    def get_evolutions(self, name: str) -> list[str]:
+        normalized_name = name.lower()
+        evolution_chain = self._get_evolution_chain(normalized_name)
+        return self._parse_evolution_chain(normalized_name, evolution_chain)
+
+    def _get_evolution_chain(self, name: str) -> dict[str, Any]:
+        species = self.pokemon_api_client.get_pokemon_species(name)
+        return self.pokemon_api_client.get_evolution_chain(
+            species["evolution_chain"]["url"]
+        )
+
+    def _parse_evolution_chain(
+        self, target_name: str, evolution_chain: dict[str, Any]
+    ) -> list[str]:
+        evolutions: list[str] = []
+        current_pokemon = evolution_chain["chain"]
+
+        while current_pokemon:
+            evolutions.append(current_pokemon["species"]["name"])
+            possible_evolutions = current_pokemon["evolves_to"]
+            if not possible_evolutions:
+                break
+            
+            # By default, choose the first evolution
+            current_pokemon = possible_evolutions[0]
+            print (current_pokemon)
+            
+            # But look for a match in the list of evolutions, in case there are multiple
+            # (ex. target_name == "jolteon" should pick jolteon, not vaporeon)
+            for evo in possible_evolutions:
+                print (evo["species"]["name"])
+                if evo["species"]["name"] != target_name:
+                    current_pokemon = evo
+                    break 
+                
+
+        return evolutions
+
+adapter = PokemonAdapter(CountingMockPokemonApiClient())
+
+data = [
+    {"input": "charmander", "expected": ["charmander", "charmeleon", "charizard"] },
+    {"input": "charmeleon", "expected": ["charmander", "charmeleon", "charizard"] },
+    {"input": "charizard", "expected": ["charmander", "charmeleon", "charizard"] },
+    {"input": "eevee", "expected": ["eevee", "vaporeon"] },
+    {"input": "vaporeon", "expected": ["eevee", "vaporeon"] },
+    {"input": "jolteon", "expected": ["eevee", "jolteon"] },
+]
+
+for test_case in data:
+    result = adapter.get_evolutions(test_case["input"])
+    print(test_case["input"] + ": " + " -> ".join(result))
+    if result != test_case["expected"]:
+        raise ValueError(f"Result did not match expected for input {test_case["input"]}")
