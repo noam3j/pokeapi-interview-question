@@ -56,12 +56,21 @@ class MockPokemonApiClient(ABC):
         if url == "https://pokeapi.co/api/v2/evolution-chain/2/":
             return {
                 "chain": {
-                    "species": {"name": "charmander"},
+                    "species": {
+                        "name": "charmander"
+                    },
                     "evolves_to": [
                         {
-                            "species": {"name": "charmeleon"},
+                            "species": {
+                                "name": "charmeleon"
+                            },
                             "evolves_to": [
-                                {"species": {"name": "charizard"}, "evolves_to": []}
+                                {
+                                    "species": {
+                                        "name": "charizard"
+                                    }, 
+                                    "evolves_to": []
+                                }
                             ],
                         }
                     ],
